@@ -1,0 +1,10 @@
+<VirtualHost *:80>
+    ServerName {{ facette_hostname }}
+
+    RequestHeader set X-Forwarded-Proto "http"
+
+    ProxyRequests Off
+    ProxyPreserveHost On
+    ProxyPass / http://localhost:12003/
+    ProxyPassReverse / http://localhost:12003/
+</VirtualHost>

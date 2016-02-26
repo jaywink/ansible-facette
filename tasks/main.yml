@@ -1,0 +1,58 @@
+---
+## Apache
+- name: Install Apache2
+  apt: name={{ item }} state=present update_cache=yes cache_valid_time=86400
+  with_items:
+    - apache2
+- name: Ensure system locale in Apache envvars
+  lineinfile: dest=/etc/apache2/envvars line=". /etc/default/locale" insertbefore="export LANG" backup=yes
+  notify:
+    - restart apache
+- name: Apache modules
+  apache2_module: state=present name={{ item }}
+  with_items:
+    - proxy
+    - ssl
+    - proxy_http
+    - headers
+  notify:
+    - restart apache
+- name: Apache site
+  template: dest=/etc/apache2/sites-available/{{ facette_hostname }}.conf src=apache.conf.j2
+- name: Enable site
+  command: a2ensite {{ facette_hostname }}
+  notify:
+    - restart apache
+
+
+## Providers - collectd
+- name: Install collectd
+  apt: name=collectd state=present update_cache=yes cache_valid_time=86400
+  notify:
+    - restart facette
+
+
+## Facette
+- name: Check if facette is installed
+  command: /usr/bin/dpkg -l facette
+  register: facette_installed
+  ignore_errors: True
+- name: Download facette deb
+  command: /usr/bin/wget https://github.com/facette/facette/releases/download/0.3.0/facette_0.3.0-1.trusty_amd64.deb -O /tmp/facette_0.3.0-1.trusty_amd64.deb
+  when: facette_installed.rc == 1
+- name: Install facette deb
+  apt: deb=/tmp/facette_0.3.0-1.trusty_amd64.deb
+  when: facette_installed.rc == 1
+  notify:
+    - restart facette
+- name: Remove facette deb
+  file: path=/tmp/facette_0.3.0-1.trusty_amd64.deb state=absent
+  when: facette_installed.rc == 1
+- name: Enable collectd provider
+  template: dest=/etc/facette/providers/collectd.json src=collectd_provider.j2
+  notify:
+    - restart facette
+- name: Enable facette
+  lineinfile: line="ENABLED=true" dest=/etc/default/facette state=present
+  notify:
+    - restart facette
